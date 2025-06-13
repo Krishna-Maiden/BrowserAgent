@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text;
+using System.Threading.Tasks;
 using AgentCore.Models;
 
 namespace AgentCore.AI
@@ -16,7 +18,6 @@ namespace AgentCore.AI
 
         public async Task<List<TaskStep>> GeneratePlan(string input)
         {
-            // Replace with actual OpenAI endpoint and key
             var requestBody = new
             {
                 model = "gpt-4",

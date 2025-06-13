@@ -1,0 +1,14 @@
+
+.vs
+bin
+obj
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.sln.ide
+*.sln.ide.*
+*.sln.ide.user
+*.sln.ide.user.*
+*.sln.ide.vs
+*.sln.ide.vs.*
