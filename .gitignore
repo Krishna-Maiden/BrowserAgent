@@ -12,3 +12,4 @@ obj
 *.sln.ide.user.*
 *.sln.ide.vs
 *.sln.ide.vs.*
+node_modules

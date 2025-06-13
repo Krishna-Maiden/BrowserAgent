@@ -6,11 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\AgentCore\AgentCore.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Playwright" Version="1.40.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.0-preview.3.24172.9" />
   </ItemGroup>
 

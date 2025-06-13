@@ -1,12 +1,12 @@
 {
   "profiles": {
-    "WebUI": {
+    "server": {
       "commandName": "Project",
       "launchBrowser": true,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
-      "applicationUrl": "https://localhost:58547;http://localhost:58548"
+      "applicationUrl": "https://localhost:61917;http://localhost:61918"
     }
   }
 }

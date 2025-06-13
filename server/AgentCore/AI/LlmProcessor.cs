@@ -1,20 +1,13 @@
-using System.Collections.Generic;
 using System.Net.Http;
 using System.Text.Json;
 using System.Text;
-using System.Threading.Tasks;
 using AgentCore.Models;
 
 namespace AgentCore.AI
 {
     public class LlmProcessor
     {
-        private readonly HttpClient _httpClient;
-
-        public LlmProcessor()
-        {
-            _httpClient = new HttpClient();
-        }
+        private readonly HttpClient _httpClient = new();
 
         public async Task<List<TaskStep>> GeneratePlan(string input)
         {
@@ -27,14 +20,14 @@ namespace AgentCore.AI
                 }
             };
 
-            var response = await _httpClient.PostAsync(
-                "https://api.openai.com/v1/chat/completions",
-                new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json")
-            );
+            var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
+            request.Headers.Add("Authorization", "Bearer sk-REPLACE_WITH_YOUR_KEY");
+            request.Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
 
+            var response = await _httpClient.SendAsync(request);
             var content = await response.Content.ReadAsStringAsync();
-            var plan = JsonSerializer.Deserialize<List<TaskStep>>(content);
-            return plan ?? new List<TaskStep>();
+
+            return JsonSerializer.Deserialize<List<TaskStep>>(content) ?? new List<TaskStep>();
         }
     }
 }

@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using AgentCore.Models;
 using AgentCore.Automation;
@@ -15,22 +14,17 @@ namespace AgentCore.Services
             _logger = logger;
         }
 
-        public void Store(string task, List<TaskStep> steps)
-        {
-            _memory[task] = steps;
-        }
+        public void Store(string task, List<TaskStep> steps) => _memory[task] = steps;
 
-        public List<TaskStep>? Get(string task)
-        {
-            return _memory.TryGetValue(task, out var steps) ? steps : null;
-        }
+        public List<TaskStep>? Get(string task) =>
+            _memory.TryGetValue(task, out var steps) ? steps : null;
 
         public void Retry(string task, PlaywrightExecutor executor)
         {
-            if (_memory.ContainsKey(task))
+            if (_memory.TryGetValue(task, out var steps))
             {
                 _logger.LogInformation($"Retrying task: {task}");
-                executor.ExecutePlanAsync(_memory[task]).Wait();
+                executor.ExecutePlanAsync(steps).Wait();
             }
         }
     }
