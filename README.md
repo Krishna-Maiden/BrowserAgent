@@ -1,2 +1,1 @@
-# BrowserAgent
-BrowserAgent
+// README.md content placeholder
