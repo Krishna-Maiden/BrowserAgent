@@ -1,1 +1,1 @@
-// Startup.cs content placeholder
+// Not needed in .NET 6 minimal hosting

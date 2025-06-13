@@ -1,1 +1,8 @@
-// WebUI.csproj content placeholder
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AgentCore\AgentCore.csproj" />
+  </ItemGroup>
+</Project>
