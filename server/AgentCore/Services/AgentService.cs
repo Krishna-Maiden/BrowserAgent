@@ -20,9 +20,9 @@ namespace AgentCore.Services
 
         public async Task RunUserTask(string task)
         {
-            var plan = await _llm.GeneratePlan(task);
-            _memory.Store(task, plan);
-            await _executor.ExecutePlanAsync(plan);
+            var plan = await _llm.GeneratePlanAsync(task);
+            _memory.Store(task, plan.Tasks);
+            await _executor.ExecutePlanAsync(plan.Tasks);
         }
     }
 }

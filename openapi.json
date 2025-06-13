@@ -1,0 +1,105 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Browser AI Agent Planner API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/plan": {
+      "post": {
+        "summary": "Generate browser automation plan from user task prompt",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "prompt": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "prompt"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Generated task plan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskPlan"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "TaskPlan": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TaskStep"
+            }
+          }
+        }
+      },
+      "TaskStep": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "timeInSeconds": {
+            "type": "integer"
+          },
+          "identification": {
+            "$ref": "#/components/schemas/ElementIdentification"
+          }
+        },
+        "required": [
+          "action",
+          "description"
+        ]
+      },
+      "ElementIdentification": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "xpath",
+              "css"
+            ]
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ]
+      }
+    }
+  }
+}

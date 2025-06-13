@@ -11,4 +11,10 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.0-preview.3.24172.9" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="AgentCore\AI\LlmPrompt.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

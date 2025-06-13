@@ -10,7 +10,7 @@ using AgentCore.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddCors();
-builder.Services.AddSingleton<LlmProcessor>();
+builder.Services.AddHttpClient<LlmProcessor>();
 builder.Services.AddSingleton<PlaywrightExecutor>();
 builder.Services.AddSingleton<RetryMemory>();
 builder.Services.AddSingleton<AgentService>();
