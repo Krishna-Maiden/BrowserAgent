@@ -1,5 +1,5 @@
-@page "/"
-@inject AgentService AgentService
+@page "/dashboard"
+@inject AgentCore.Services.AgentService AgentService
 
 <h3>AI Browser Agent</h3>
 <textarea @bind="UserTask" rows="6" cols="80"></textarea>
@@ -9,13 +9,16 @@
 <p>@Status</p>
 
 @code {
-    private string UserTask;
-    private string Status;
+    private string? UserTask;
+    private string Status = "";
 
     private async Task RunTask()
     {
         Status = "Processing...";
-        await AgentService.RunUserTask(UserTask);
+        if (!string.IsNullOrWhiteSpace(UserTask))
+        {
+            await AgentService.RunUserTask(UserTask);
+        }
         Status = "Done.";
     }
 }

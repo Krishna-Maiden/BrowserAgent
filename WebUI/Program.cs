@@ -19,6 +19,9 @@ var app = builder.Build();
 
 app.UseStaticFiles();
 app.UseRouting();
+
+app.MapRazorPages(); // Required for _Host fallback to work
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
+
 app.Run();
