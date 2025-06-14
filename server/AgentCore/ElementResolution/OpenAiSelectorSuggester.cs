@@ -8,12 +8,12 @@ namespace AgentCore.ElementResolution
     public class OpenAiSelectorSuggester : ILlmSelectorSuggester
     {
         private readonly HttpClient _httpClient;
-        private readonly string _openAiKey;
+        private readonly string _apiKey;
 
-        public OpenAiSelectorSuggester(HttpClient client, string openAiKey)
+        public OpenAiSelectorSuggester(HttpClient client, IConfiguration config)
         {
             _httpClient = client;
-            _openAiKey = openAiKey;
+            _apiKey = config["OpenAI:ApiKey"]; // <-- appsettings.json key
         }
 
         public async Task<string> SuggestSelectorAsync(IPage page, string logicalName)
@@ -25,8 +25,7 @@ namespace AgentCore.ElementResolution
                 messages = new[]
                 {
                     new { role = "system", content = "You are an expert UI tester." },
-                    new { role = "user", content = $"Suggest the best XPath for an element named '{logicalName}' from the following HTML:
-{html}" }
+                    new { role = "user", content = $"Suggest the best XPath for an element named '{logicalName}' from the following HTML: {html}" }
                 }
             };
 

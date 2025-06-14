@@ -1,38 +1,37 @@
-using System.Threading.Tasks;
+using AgentCore.Automation;
+using AgentCore.Models;
 using Microsoft.Playwright;
+using System.Threading.Tasks;
 
 namespace AgentCore.ElementResolution
 {
     public class ElementResolver
     {
-        private readonly ISelectorMemory _selectorMemory;
-        private readonly ILlmSelectorSuggester _llmSuggester;
+        private readonly ISelectorMemory _memory;
+        private readonly ILlmSelectorSuggester _llm;
 
-        public ElementResolver(ISelectorMemory memory, ILlmSelectorSuggester suggester)
+        public ElementResolver(ISelectorMemory memory, ILlmSelectorSuggester llm)
         {
-            _selectorMemory = memory;
-            _llmSuggester = suggester;
+            _memory = memory;
+            _llm = llm;
         }
 
-        public async Task<ILocator> ResolveSelectorAsync(IPage page, string logicalName)
+        public async Task<ILocator> ResolveAsync(IPage page, Identification identification)
         {
-            var selector = _selectorMemory.GetSelector(logicalName);
-            if (!string.IsNullOrEmpty(selector))
+            string key = identification.Type + ":" + identification.Value;
+            var cachedSelector = _memory.Get(key);
+
+            if (!string.IsNullOrWhiteSpace(cachedSelector))
             {
-                var locator = page.Locator(selector);
-                if (await locator.CountAsync() > 0)
+                var locator = page.Locator(cachedSelector);
+                if (await locator.IsVisibleAsync())
                     return locator;
             }
 
-            // Ask LLM if no selector found or failed
-            var suggested = await _llmSuggester.SuggestSelectorAsync(page, logicalName);
-            if (!string.IsNullOrEmpty(suggested))
-            {
-                _selectorMemory.SaveSelector(logicalName, suggested);
-                return page.Locator(suggested);
-            }
+            string selector = await _llm.SuggestSelectorAsync(page, identification.Value);
 
-            return null;
+            _memory.Save(key, selector);
+            return page.Locator(selector);
         }
     }
 }

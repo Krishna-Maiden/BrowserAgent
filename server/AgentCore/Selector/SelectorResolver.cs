@@ -1,38 +1,60 @@
+using AgentCore.ElementResolution;
+using AgentCore.Models;
+using Microsoft.Playwright;
+using System;
+using System.Threading.Tasks;
 
-using System.Collections.Generic;
-using System.Linq;
-
-namespace AgentCore.Selector
+namespace AgentCore.Automation
 {
     public class SelectorResolver
     {
-        public static List<string> ResolveAll(TaskStep step)
+        private readonly ISelectorMemory _memory;
+        private readonly ILlmSelectorSuggester _llm;
+
+        public SelectorResolver(ISelectorMemory memory, ILlmSelectorSuggester llm)
         {
-            var selectors = new List<string>();
+            _memory = memory;
+            _llm = llm;
+        }
 
-            if (step.Identification != null)
+        public async Task<string> ResolveAsync(IPage page, Identification identification)
+        {
+            if (identification == null || string.IsNullOrWhiteSpace(identification.Value))
+                throw new ArgumentException("Identification value cannot be null.");
+
+            // Check memory first
+            var knownSelector = _memory.Get(identification.Value);
+            if (!string.IsNullOrWhiteSpace(knownSelector))
+                return knownSelector;
+
+            // Try original selector
+            try
             {
-                if (!string.IsNullOrEmpty(step.Identification.Value))
-                    selectors.Add(step.Identification.Value);
+                var locator = page.Locator(identification.Value);
+                if (await locator.IsVisibleAsync())
+                {
+                    _memory.Save(identification.Value, identification.Value);
+                    return identification.Value;
+                }
+            }
+            catch
+            {
+                // Continue to AI suggestion
+            }
 
-                // Fallbacks based on type
-                if (step.Identification.Type?.ToLower() == "text")
+            // Fallback to LLM suggestion
+            var suggestion = await _llm.SuggestSelectorAsync(page, identification.Value);
+            if (!string.IsNullOrWhiteSpace(suggestion))
+            {
+                var locator = page.Locator(suggestion);
+                if (await locator.IsVisibleAsync())
                 {
-                    selectors.Add($"xpath=//*[contains(text(), '{step.Identification.Value}')]");
-                    selectors.Add($"css=*:contains('{step.Identification.Value}')");
-                }
-                else if (step.Identification.Type?.ToLower() == "id")
-                {
-                    selectors.Add($"#{step.Identification.Value}");
-                    selectors.Add($"[id='{step.Identification.Value}']");
-                }
-                else if (step.Identification.Type?.ToLower() == "name")
-                {
-                    selectors.Add($"[name='{step.Identification.Value}']");
+                    _memory.Save(identification.Value, suggestion);
+                    return suggestion;
                 }
             }
 
-            return selectors.Distinct().ToList();
+            throw new Exception($"Unable to resolve selector: {identification.Value}");
         }
     }
 }
