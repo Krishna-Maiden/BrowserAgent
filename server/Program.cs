@@ -17,8 +17,30 @@ builder.Services.AddEndpointsApiExplorer();
 
 // Dependency injection for Selector Resolver Engine
 builder.Services.AddSingleton<ISelectorMemory, InMemorySelectorMemory>();
-builder.Services.AddHttpClient<OpenAiSelectorSuggester>();
-builder.Services.AddSingleton<ILlmSelectorSuggester, OpenAiSelectorSuggester>();
+
+if (builder.Configuration.GetValue<bool>("LlmConfig:UseLocal"))
+{
+    builder.Services.AddSingleton<ILlmSelectorSuggester, HybridSelectorSuggester>();
+    builder.Services.AddSingleton<LocalLlmSelectorSuggester>();
+    builder.Services.AddHttpClient<OpenAiSelectorSuggester>();
+    builder.Services.AddSingleton<ILlmSelectorSuggester>(sp =>
+        new HybridSelectorSuggester(
+            sp.GetRequiredService<LocalLlmSelectorSuggester>(),
+            sp.GetRequiredService<OpenAiSelectorSuggester>()));
+}
+else
+{
+    builder.Services.AddSingleton<ILlmSelectorSuggester, OpenAiSelectorSuggester>();
+}
+
+// var llmProvider = builder.Configuration["LlmProvider"];
+//if (llmProvider == "ollama")
+//    builder.Services.AddSingleton<ILlmSelectorSuggester, LocalLlmSelectorSuggester>();
+//else
+//    builder.Services.AddHttpClient<ILlmSelectorSuggester, OpenAiSelectorSuggester>();
+
+
+//builder.Services.AddSingleton<ILlmSelectorSuggester, OpenAiSelectorSuggester>();
 builder.Services.AddSingleton<SelectorResolver>();
 
 // Core automation and LLM integration
