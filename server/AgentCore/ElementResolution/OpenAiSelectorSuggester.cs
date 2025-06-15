@@ -1,10 +1,10 @@
-using Microsoft.AspNetCore.DataProtection.KeyManagement;
-using Microsoft.Playwright;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.Playwright;
+using AgentCore.Models;
+using AgentCore.ElementResolution;
 
 namespace AgentCore.ElementResolution
 {
@@ -12,60 +12,51 @@ namespace AgentCore.ElementResolution
     {
         private readonly HttpClient _httpClient;
         private readonly string _apiKey;
+        private readonly string _promptTemplate;
 
-        public OpenAiSelectorSuggester(HttpClient client, IConfiguration config)
+        public OpenAiSelectorSuggester(HttpClient httpClient, IConfiguration configuration)
         {
-            _httpClient = client;
-            _apiKey = config["OpenAI:ApiKey"]; // <-- appsettings.json key
+            _httpClient = httpClient;
+            _apiKey = configuration["OpenAI:ApiKey"];
+            _promptTemplate = File.ReadAllText("Prompts/llm_prompt_template.txt");
         }
 
         public async Task<string> SuggestSelectorAsync(IPage page, string logicalName)
         {
-            var endpoint = "https://api.openai.com/v1/chat/completions";
-            string rawHtml = await page.ContentAsync();
-            string strippedHtml = HtmlCleaner.RemoveHeadTag(rawHtml); // new helper method
-            var prompt = "You are an expert UI tester.";
-            string userInput = $"Suggest the best XPath for an element named '{logicalName}' from the following HTML: {strippedHtml}";
+            string html = await page.ContentAsync();
+            string prompt = _promptTemplate
+                .Replace("{logicalName}", logicalName)
+                .Replace("{html}", StripHeadTag(html));
 
             var requestBody = new
             {
                 model = "gpt-4-0613",
                 messages = new[]
-            {
-                new { role = "system", content = prompt },
-                new { role = "user", content = userInput }
-            }
+                {
+                    new { role = "user", content = prompt }
+                },
+                temperature = 0.3
             };
 
-            var requestJson = JsonSerializer.Serialize(requestBody);
-            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
-            request.Content = new StringContent(requestJson, Encoding.UTF8, "application/json");
+            var request = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions");
+            request.Headers.Add("Authorization", $"Bearer {_apiKey}");
+            request.Content = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
 
             var response = await _httpClient.SendAsync(request);
-            var result = await response.Content.ReadAsStringAsync();
-            using var doc = JsonDocument.Parse(result);
+            response.EnsureSuccessStatusCode();
+            var responseBody = await response.Content.ReadAsStringAsync();
+
+            using var doc = JsonDocument.Parse(responseBody);
             return doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
         }
 
-        public static class HtmlCleaner
+        private string StripHeadTag(string html)
         {
-            public static string RemoveHeadTag(string html)
-            {
-                if (string.IsNullOrWhiteSpace(html))
-                    return html;
-
-                int headStart = html.IndexOf("<head", StringComparison.OrdinalIgnoreCase);
-                if (headStart == -1)
-                    return html;
-
-                int headEnd = html.IndexOf("</head>", headStart, StringComparison.OrdinalIgnoreCase);
-                if (headEnd == -1)
-                    return html;
-
-                headEnd += "</head>".Length;
-                return html.Remove(headStart, headEnd - headStart);
-            }
+            int headStart = html.IndexOf("<head", StringComparison.OrdinalIgnoreCase);
+            int headEnd = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+            if (headStart >= 0 && headEnd > headStart)
+                return html.Remove(headStart, headEnd - headStart + 7);
+            return html;
         }
     }
 }
