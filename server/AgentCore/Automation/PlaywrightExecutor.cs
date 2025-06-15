@@ -46,28 +46,17 @@ namespace AgentCore.Automation
                             var username = usernameEl.GetString();
                             var password = passwordEl.GetString();
 
-                            var usernameLocator = await _resolver.ResolveAsync(page, new Identification
-                            {
-                                Type = "logicalName",
-                                Value = "username"
-                            });
-                            await usernameLocator.FillAsync(username);
+                            var usernameSelector = await _resolver.ResolveAsync(page, new Identification { Type = "logical", Value = "username" });
+                            var passwordSelector = await _resolver.ResolveAsync(page, new Identification { Type = "logical", Value = "password" });
+                            var loginButtonSelector = await _resolver.ResolveAsync(page, new Identification { Type = "logical", Value = "login" });
 
-                            var passwordLocator = await _resolver.ResolveAsync(page, new Identification
-                            {
-                                Type = "logicalName",
-                                Value = "password"
-                            });
-                            await passwordLocator.FillAsync(password);
-
-                            var loginButtonLocator = await _resolver.ResolveAsync(page, new Identification
-                            {
-                                Type = "logicalName",
-                                Value = "login"
-                            });
-                            await loginButtonLocator.ClickAsync();
+                            await page.FillAsync(usernameSelector, username);
+                            await page.FillAsync(passwordSelector, password);
+                            await page.ClickAsync(loginButtonSelector);
                         }
                         break;
+
+
 
                     case "click":
                         if (!string.IsNullOrWhiteSpace(selector))
