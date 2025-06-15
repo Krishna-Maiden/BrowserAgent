@@ -1,9 +1,8 @@
-using AgentCore.ElementResolution;
-using AgentCore.Models;
-using Microsoft.Playwright;
-using System;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Microsoft.Playwright;
+using AgentCore.Models;
+using AgentCore.ElementResolution;
 
 namespace AgentCore.Automation
 {
@@ -11,62 +10,61 @@ namespace AgentCore.Automation
     {
         private readonly ISelectorMemory _memory;
         private readonly ILlmSelectorSuggester _llm;
+        private readonly IPageElementCache _cache;
 
-        public SelectorResolver(ISelectorMemory memory, ILlmSelectorSuggester llm)
+        public SelectorResolver(
+            ISelectorMemory memory,
+            ILlmSelectorSuggester llm,
+            IPageElementCache cache)
         {
             _memory = memory;
             _llm = llm;
+            _cache = cache;
         }
 
-        public async Task<string> ResolveAsync(IPage page, Identification identification)
+        public async Task<ILocator> ResolveAsync(IPage page, Identification identification)
         {
-            if (identification == null || string.IsNullOrWhiteSpace(identification.Value))
-                throw new ArgumentException("Identification value cannot be null.");
+            string key = identification.Type + ":" + identification.Value;
+            var cachedSelector = _memory.Get(key);
 
-            // Check memory first
-            var knownSelector = _memory.Get(identification.Value);
-            if (!string.IsNullOrWhiteSpace(knownSelector))
-                return knownSelector;
-
-            // Try original selector
-            try
+            // 1. Check memory cache first
+            if (!string.IsNullOrWhiteSpace(cachedSelector))
             {
-                var locator = page.Locator(identification.Value);
+                var locator = page.Locator(SanitizeSelector(cachedSelector));
                 if (await locator.IsVisibleAsync())
+                    return locator;
+            }
+
+            // 2. Check page element cache (based on page URL + logical name)
+            if (page.Url is string pageUrl)
+            {
+                var pageCached = _cache.Get(pageUrl, identification.Value);
+                if (!string.IsNullOrWhiteSpace(pageCached))
                 {
-                    _memory.Save(identification.Value, identification.Value);
-                    return identification.Value;
+                    var locator = page.Locator(SanitizeSelector(pageCached));
+                    if (await locator.IsVisibleAsync())
+                    {
+                        _memory.Save(key, pageCached); // Promote to memory
+                        return locator;
+                    }
                 }
             }
-            catch
-            {
-                // Continue to AI suggestion
-            }
 
-            // Fallback to LLM suggestion
-            var selector = await _llm.SuggestSelectorAsync(page, identification.Value);
+            // 3. Fallback to LLM (local/Ollama or OpenAI via HybridSuggester)
+            string selector = await _llm.SuggestSelectorAsync(page, identification.Value);
             selector = SanitizeSelector(selector);
-            if (!string.IsNullOrWhiteSpace(selector))
-            {
-                var locator = page.Locator(selector);
-                if (await locator.IsVisibleAsync())
-                {
-                    _memory.Save(identification.Value, selector);
-                    return selector;
-                }
-            }
-
-            throw new Exception($"Unable to resolve selector: {identification.Value}");
+            _memory.Save(key, selector);
+            return page.Locator(selector);
         }
 
         private string SanitizeSelector(string selector)
         {
             if (string.IsNullOrWhiteSpace(selector)) return selector;
 
-            // Remove backticks and trim any quotes
+            // Remove backticks and trim quotes
             selector = selector.Trim().Trim('`', '\"', '\'');
 
-            // Replace double quotes with single quotes inside selector
+            // Replace double quotes inside selector
             selector = Regex.Replace(selector, "\"(.*?)\"", "'$1'");
 
             return selector;

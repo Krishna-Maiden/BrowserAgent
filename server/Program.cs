@@ -1,6 +1,8 @@
 using AgentCore.AI;
 using AgentCore.Automation;
 using AgentCore.ElementResolution;
+using AgentCore.Helpers;
+
 //using AgentCore.Interfaces;
 using AgentCore.Services;
 using Microsoft.AspNetCore.Builder;
@@ -35,6 +37,9 @@ else
     builder.Services.AddSingleton<ILlmSelectorSuggester, OpenAiSelectorSuggester>();
 }
 
+builder.Services.AddSingleton<IPageElementCache, PageElementCache>();
+builder.Services.AddSingleton<PageElementCacheLoader>(); // Responsible for extracting page elements after navigation
+
 // var llmProvider = builder.Configuration["LlmProvider"];
 //if (llmProvider == "ollama")
 //    builder.Services.AddSingleton<ILlmSelectorSuggester, LocalLlmSelectorSuggester>();
@@ -43,7 +48,7 @@ else
 
 
 //builder.Services.AddSingleton<ILlmSelectorSuggester, OpenAiSelectorSuggester>();
-builder.Services.AddSingleton<SelectorResolver>();
+builder.Services.AddSingleton<SelectorResolver>(); // Core resolver used by PlaywrightExecutor
 
 // Core automation and LLM integration
 builder.Services.AddHttpClient<LlmProcessor>();
