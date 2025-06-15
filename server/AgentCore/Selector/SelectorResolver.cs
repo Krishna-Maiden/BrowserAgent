@@ -2,6 +2,7 @@ using AgentCore.ElementResolution;
 using AgentCore.Models;
 using Microsoft.Playwright;
 using System;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace AgentCore.Automation
@@ -43,18 +44,32 @@ namespace AgentCore.Automation
             }
 
             // Fallback to LLM suggestion
-            var suggestion = await _llm.SuggestSelectorAsync(page, identification.Value);
-            if (!string.IsNullOrWhiteSpace(suggestion))
+            var selector = await _llm.SuggestSelectorAsync(page, identification.Value);
+            selector = SanitizeSelector(selector);
+            if (!string.IsNullOrWhiteSpace(selector))
             {
-                var locator = page.Locator(suggestion);
+                var locator = page.Locator(selector);
                 if (await locator.IsVisibleAsync())
                 {
-                    _memory.Save(identification.Value, suggestion);
-                    return suggestion;
+                    _memory.Save(identification.Value, selector);
+                    return selector;
                 }
             }
 
             throw new Exception($"Unable to resolve selector: {identification.Value}");
+        }
+
+        private string SanitizeSelector(string selector)
+        {
+            if (string.IsNullOrWhiteSpace(selector)) return selector;
+
+            // Remove backticks and trim any quotes
+            selector = selector.Trim().Trim('`', '\"', '\'');
+
+            // Replace double quotes with single quotes inside selector
+            selector = Regex.Replace(selector, "\"(.*?)\"", "'$1'");
+
+            return selector;
         }
     }
 }

@@ -48,7 +48,7 @@ namespace AgentCore.Automation
 
                             var usernameSelector = await _resolver.ResolveAsync(page, new Identification { Type = "logical", Value = "username" });
                             var passwordSelector = await _resolver.ResolveAsync(page, new Identification { Type = "logical", Value = "password" });
-                            var loginButtonSelector = await _resolver.ResolveAsync(page, new Identification { Type = "logical", Value = "login" });
+                            var loginButtonSelector = await _resolver.ResolveAsync(page, new Identification { Type = "logical", Value = "login button" });
 
                             await page.FillAsync(usernameSelector, username);
                             await page.FillAsync(passwordSelector, password);
