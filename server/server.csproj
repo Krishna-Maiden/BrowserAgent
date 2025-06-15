@@ -20,4 +20,8 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="AgentCore\Helpers\" />
+  </ItemGroup>
+
 </Project>

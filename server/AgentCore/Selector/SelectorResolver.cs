@@ -25,49 +25,41 @@ namespace AgentCore.Automation
         public async Task<ILocator> ResolveAsync(IPage page, Identification identification)
         {
             string key = identification.Type + ":" + identification.Value;
-            var cachedSelector = _memory.Get(key);
 
-            // 1. Check memory cache first
-            if (!string.IsNullOrWhiteSpace(cachedSelector))
+            // 1. Check memory cache
+            var memSelector = _memory.Get(key);
+            if (!string.IsNullOrWhiteSpace(memSelector))
             {
-                var locator = page.Locator(SanitizeSelector(cachedSelector));
+                var locator = page.Locator(SanitizeSelector(memSelector));
                 if (await locator.IsVisibleAsync())
                     return locator;
             }
 
-            // 2. Check page element cache (based on page URL + logical name)
-            if (page.Url is string pageUrl)
+            // 2. Check page element cache
+            var cachedSelector = _cache.GetCachedSelector(page.Url, identification.Value);
+            if (!string.IsNullOrWhiteSpace(cachedSelector))
             {
-                var pageCached = _cache.Get(pageUrl, identification.Value);
-                if (!string.IsNullOrWhiteSpace(pageCached))
+                var locator = page.Locator(SanitizeSelector(cachedSelector));
+                if (await locator.IsVisibleAsync())
                 {
-                    var locator = page.Locator(SanitizeSelector(pageCached));
-                    if (await locator.IsVisibleAsync())
-                    {
-                        _memory.Save(key, pageCached); // Promote to memory
-                        return locator;
-                    }
+                    _memory.Save(key, cachedSelector); // promote to memory
+                    return locator;
                 }
             }
 
-            // 3. Fallback to LLM (local/Ollama or OpenAI via HybridSuggester)
-            string selector = await _llm.SuggestSelectorAsync(page, identification.Value);
-            selector = SanitizeSelector(selector);
-            _memory.Save(key, selector);
-            return page.Locator(selector);
+            // 3. Fallback to LLM suggestion (local or remote)
+            string newSelector = await _llm.SuggestSelectorAsync(page, identification.Value);
+            newSelector = SanitizeSelector(newSelector);
+            _memory.Save(key, newSelector);
+            return page.Locator(newSelector);
         }
 
         private string SanitizeSelector(string selector)
         {
             if (string.IsNullOrWhiteSpace(selector)) return selector;
 
-            // Remove backticks and trim quotes
             selector = selector.Trim().Trim('`', '\"', '\'');
-
-            // Replace double quotes inside selector
-            selector = Regex.Replace(selector, "\"(.*?)\"", "'$1'");
-
-            return selector;
+            return Regex.Replace(selector, "\"(.*?)\"", "'$1'");
         }
     }
 }

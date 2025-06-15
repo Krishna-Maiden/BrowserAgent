@@ -1,60 +1,64 @@
 ﻿using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
+using Microsoft.Playwright;
 
 namespace AgentCore.ElementResolution
 {
     public class InMemoryPageElementCache : IPageElementCache
     {
-        // Key format: pageUrl:logicalName -> selector
-        private readonly ConcurrentDictionary<string, string> _cache = new();
+        private readonly ConcurrentDictionary<string, Dictionary<string, string>> _cache = new();
 
-        public void Save(string pageUrl, string logicalName, string selector)
+        public async Task CachePageElementsAsync(IPage page, string pageUrl)
         {
-            if (string.IsNullOrWhiteSpace(pageUrl) || string.IsNullOrWhiteSpace(logicalName) || string.IsNullOrWhiteSpace(selector))
-                return;
+            var elements = await page.QuerySelectorAllAsync("*");
+            var logicalMap = new Dictionary<string, string>();
 
-            var key = BuildKey(pageUrl, logicalName);
-            _cache[key] = selector;
-        }
-
-        public string Get(string pageUrl, string logicalName)
-        {
-            if (string.IsNullOrWhiteSpace(pageUrl) || string.IsNullOrWhiteSpace(logicalName))
-                return null;
-
-            var key = BuildKey(pageUrl, logicalName);
-            return _cache.TryGetValue(key, out var selector) ? selector : null;
-        }
-
-        public void Clear(string pageUrl = null)
-        {
-            if (string.IsNullOrWhiteSpace(pageUrl))
+            foreach (var element in elements)
             {
-                _cache.Clear();
+                try
+                {
+                    string? tag = await element.EvaluateAsync<string>("el => el.tagName.toLowerCase()");
+                    string? name = await element.GetAttributeAsync("name");
+                    string? placeholder = await element.GetAttributeAsync("placeholder");
+                    string? type = await element.GetAttributeAsync("type");
+                    string? innerText = await element.InnerTextAsync();
+
+                    var logicalName = BuildLogicalName(tag, name, placeholder, type, innerText);
+                    if (!string.IsNullOrWhiteSpace(logicalName))
+                    {
+                        var selector = await page.EvaluateAsync<string>("el => window.getSelector?.(el) || ''", element);
+                        if (!string.IsNullOrWhiteSpace(selector))
+                            logicalMap[logicalName.ToLower()] = selector;
+                    }
+                }
+                catch
+                {
+                    // Ignore problematic elements
+                }
             }
-            else
+
+            _cache[pageUrl] = logicalMap;
+        }
+
+        public string GetCachedSelector(string pageUrl, string logicalName)
+        {
+            if (_cache.TryGetValue(pageUrl, out var map))
             {
-                var prefix = $"{pageUrl.Trim().ToLowerInvariant()}::";
-                foreach (var key in _cache.Keys.Where(k => k.StartsWith(prefix)).ToList())
-                    _cache.TryRemove(key, out _);
+                if (map.TryGetValue(logicalName.ToLower(), out var selector))
+                    return selector;
             }
+            return null;
         }
 
-        public IEnumerable<string> GetLogicalNames(string pageUrl)
+        public List<string> GetLogicalNames(string pageUrl)
         {
-            if (string.IsNullOrWhiteSpace(pageUrl)) return Enumerable.Empty<string>();
-
-            var prefix = $"{pageUrl.Trim().ToLowerInvariant()}::";
-            return _cache.Keys
-                .Where(k => k.StartsWith(prefix))
-                .Select(k => k.Substring(prefix.Length))
-                .ToList();
+            if (_cache.TryGetValue(pageUrl, out var map))
+                return map.Keys.ToList();
+            return new List<string>();
         }
 
-        private string BuildKey(string pageUrl, string logicalName)
+        private string BuildLogicalName(string? tag, string? name, string? placeholder, string? type, string? innerText)
         {
-            return $"{pageUrl.Trim().ToLowerInvariant()}::{logicalName.Trim().ToLowerInvariant()}";
+            return $"{tag}_{name ?? placeholder ?? type ?? innerText}".Replace(" ", "_").ToLower();
         }
     }
 }
