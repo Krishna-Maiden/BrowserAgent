@@ -20,9 +20,11 @@ builder.Services.AddSingleton<ISelectorMemory, InMemorySelectorMemory>();
 
 if (builder.Configuration.GetValue<bool>("LlmConfig:UseLocal"))
 {
-    builder.Services.AddSingleton<ILlmSelectorSuggester, HybridSelectorSuggester>();
+    
     builder.Services.AddSingleton<LocalLlmSelectorSuggester>();
     builder.Services.AddHttpClient<OpenAiSelectorSuggester>();
+    //builder.Services.AddSingleton<ILlmSelectorSuggester, HybridSelectorSuggester>();
+
     builder.Services.AddSingleton<ILlmSelectorSuggester>(sp =>
         new HybridSelectorSuggester(
             sp.GetRequiredService<LocalLlmSelectorSuggester>(),

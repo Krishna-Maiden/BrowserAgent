@@ -30,7 +30,7 @@ namespace AgentCore.ElementResolution
 
             var requestBody = new
             {
-                model = "gpt-4-0613",
+                model = "gpt-4.1",
                 messages = new[]
                 {
                     new { role = "user", content = prompt }
@@ -58,5 +58,30 @@ namespace AgentCore.ElementResolution
                 return html.Remove(headStart, headEnd - headStart + 7);
             return html;
         }
+
+        private async Task<string> CallOpenAiWithRetryAsync(HttpClient client, HttpRequestMessage request)
+        {
+            const int maxRetries = 5;
+            int delay = 1000;
+
+            for (int i = 0; i < maxRetries; i++)
+            {
+                var response = await client.SendAsync(request);
+                if (response.IsSuccessStatusCode)
+                    return await response.Content.ReadAsStringAsync();
+
+                if ((int)response.StatusCode == 429)
+                {
+                    await Task.Delay(delay);
+                    delay *= 2;
+                    continue;
+                }
+
+                response.EnsureSuccessStatusCode(); // throw on other errors
+            }
+
+            throw new Exception("Max retry attempts exceeded for OpenAI API.");
+        }
+
     }
 }

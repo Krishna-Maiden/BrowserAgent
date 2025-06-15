@@ -20,7 +20,9 @@ public class HybridSelectorSuggester : ILlmSelectorSuggester
             var result = await _local.SuggestSelectorAsync(page, logicalName);
             if (!string.IsNullOrWhiteSpace(result)) return result;
         }
-        catch { }
+        catch(Exception ex) 
+        {
+        }
 
         return await _remote.SuggestSelectorAsync(page, logicalName);
     }
