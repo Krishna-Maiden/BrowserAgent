@@ -1,6 +1,9 @@
-﻿using System.Collections.Concurrent;
+﻿using AgentCore.Models;
 using Microsoft.Playwright;
-using AgentCore.Models;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.Collections.Concurrent;
+using System.Text.Json;
 
 namespace AgentCore.ElementResolution
 {
@@ -12,73 +15,62 @@ namespace AgentCore.ElementResolution
         public async Task CachePageElementsAsync(IPage page, string pageUrl)
         {
             var elements = await page.EvaluateAsync(@"() => {
-    const uiTags = ['input', 'button', 'select', 'textarea', 'a', 'label', 'div', 'span'];
-    const nodes = Array.from(document.querySelectorAll('body *'));
+                const uiTags = ['input', 'button', 'select', 'textarea', 'a', 'label', 'div', 'span'];
+                const nodes = Array.from(document.querySelectorAll('body *'));
 
-    return nodes
-        .filter(el => {
-            const tag = el.tagName.toLowerCase();
-            const isVisible = !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
-            return uiTags.includes(tag) && isVisible;
-        })
-        .map(el => ({
-            tag: el.tagName,
-            text: el.innerText || '',
-            attributes: {
-                id: el.id || '',
-                name: el.name || '',
-                placeholder: el.placeholder || '',
-                type: el.type || '',
-                class: el.className || ''
-            },
-            selector: getUniqueSelector(el)
-        }));
+                return nodes
+                    .filter(el => {
+                        const tag = el.tagName.toLowerCase();
+                        const isVisible = !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+                        return uiTags.includes(tag) && isVisible;
+                    })
+                    .map(el => ({
+                        tag: el.tagName.toLowerCase(),
+                        text: el.innerText || '',
+                        attributes: {
+                            id: el.id || '',
+                            name: el.name || '',
+                            placeholder: el.placeholder || '',
+                            type: el.type || '',
+                            class: el.className || ''
+                        },
+                        selector: getUniqueSelector(el)
+                    }));
 
-    function getUniqueSelector(el) {
-        let path = [];
-        while (el && el.nodeType === Node.ELEMENT_NODE) {
-            let selector = el.nodeName.toLowerCase();
-            if (el.id) {
-                selector += '#' + el.id;
-                path.unshift(selector);
-                break;
-            } else {
-                let sib = el, nth = 1;
-                while (sib = sib.previousElementSibling) {
-                    if (sib.nodeName === el.nodeName) nth++;
+                function getUniqueSelector(el) {
+                    let path = [];
+                    while (el && el.nodeType === Node.ELEMENT_NODE) {
+                        let selector = el.nodeName.toLowerCase();
+                        if (el.id) {
+                            selector += '#' + el.id;
+                            path.unshift(selector);
+                            break;
+                        } else {
+                            let sib = el, nth = 1;
+                            while (sib = sib.previousElementSibling) {
+                                if (sib.nodeName === el.nodeName) nth++;
+                            }
+                            selector += `:nth-of-type(${nth})`;
+                        }
+                        path.unshift(selector);
+                        el = el.parentNode;
+                    }
+                    return path.join(' > ');
                 }
-                selector += `:nth-of-type(${nth})`;
-            }
-            path.unshift(selector);
-            el = el.parentNode;
-        }
-        return path.join(' > ');
-    }
-}");
+            }");
 
+            var elementArray = elements?.GetRawText();
+            if (elementArray == null) return;
+
+            var list = JsonConvert.DeserializeObject<List<PageElementInfo>>(elementArray);
 
             var logicalMap = new ConcurrentDictionary<string, string>();
-
-            foreach (var element in elements)
+            foreach (var element in list)
             {
-                string selector = await element.EvaluateAsync<string>("el => el.tagName.toLowerCase()");
-
-                var attrs = await element.EvaluateAsync<Dictionary<string, string>>(
-                    @"el => {
-                        const attrs = {};
-                        for (const attr of el.attributes) {
-                            attrs[attr.name] = attr.value;
-                        }
-                        return attrs;
-                    }");
-
-                string text = await element.InnerTextAsync();
-                string logicalName = GenerateLogicalName(selector, attrs, text);
-
+                var logicalName = GenerateLogicalName(element);
                 if (!string.IsNullOrWhiteSpace(logicalName) && !logicalMap.ContainsKey(logicalName))
                 {
-                    var uniqueSelector = await page.EvaluateAsync<string>("el => el.outerHTML", element);
-                    logicalMap[logicalName] = await element.EvaluateAsync<string>("el => el.tagName.toLowerCase()");
+                    logicalMap[logicalName] = element.Selector;
                 }
             }
 
@@ -104,29 +96,90 @@ namespace AgentCore.ElementResolution
             return new List<string>();
         }
 
-        private string GenerateLogicalName(string tag, Dictionary<string, string> attrs, string text)
+        private string GenerateLogicalName(PageElementInfo info)
         {
-            if (!string.IsNullOrWhiteSpace(text) && text.Length <= 100)
+            try
             {
-                return text.Trim().ToLower();
-            }
+                if (info.Attributes == null)
+                    return string.Empty;
 
-            if (attrs.TryGetValue("placeholder", out var placeholder))
-            {
-                return placeholder.ToLower();
-            }
+                var json = JObject.FromObject(info.Attributes);
 
-            if (attrs.TryGetValue("name", out var name))
-            {
-                return name.ToLower();
-            }
+                var id = json.Value<string>("id");
+                var name = json.Value<string>("name");
+                var type = json.Value<string>("type");
+                var placeholder = json.Value<string>("placeholder");
+                var label = json.Value<string>("aria-label");
+                var innerText = json.Value<string>("innerText");
 
-            if (attrs.TryGetValue("id", out var id))
-            {
-                return id.ToLower();
+                return $"{info.Tag}-{id ?? name ?? placeholder ?? label ?? innerText ?? type ?? "unknown"}"
+                    .ToLowerInvariant()
+                    .Replace(" ", "-");
             }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private string GenerateLogicalName3(PageElementInfo info)
+        {
+            try
+            {
+                if(info.Attributes == null)
+                    return string.Empty;
+                using var doc = JsonDocument.Parse(info.Attributes == null ? "{}": info.Attributes.ToString());
+                var root = doc.RootElement;
+
+                var id = root.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
+                var name = root.TryGetProperty("name", out var nameProp) ? nameProp.GetString() : null;
+                var type = root.TryGetProperty("type", out var typeProp) ? typeProp.GetString() : null;
+                var placeholder = root.TryGetProperty("placeholder", out var placeholderProp) ? placeholderProp.GetString() : null;
+                var label = root.TryGetProperty("aria-label", out var labelProp) ? labelProp.GetString() : null;
+                var innerText = root.TryGetProperty("innerText", out var textProp) ? textProp.GetString() : null;
+
+                return $"{info.Tag}-{id ?? name ?? placeholder ?? label ?? innerText ?? type ?? "unknown"}"
+                    .ToLowerInvariant()
+                    .Replace(" ", "-");
+            }
+            catch
+            {
+                return string.Empty; // Fallback in case of parsing issues
+            }
+        }
+
+        private string GenerateLogicalName2(PageElementInfo element)
+        {
+            if (!string.IsNullOrWhiteSpace(element.Text) && element.Text.Length <= 100)
+                return element.Text.Trim().ToLower();
+
+            if (!string.IsNullOrWhiteSpace(element.Attributes.Placeholder))
+                return element.Attributes.Placeholder.ToLower();
+
+            if (!string.IsNullOrWhiteSpace(element.Attributes.Name))
+                return element.Attributes.Name.ToLower();
+
+            if (!string.IsNullOrWhiteSpace(element.Attributes.Id))
+                return element.Attributes.Id.ToLower();
 
             return null;
+        }
+
+        public class PageElementInfo
+        {
+            public string Tag { get; set; }
+            public string Text { get; set; }
+            public string Selector { get; set; }
+            public ElementAttributes Attributes { get; set; }
+        }
+
+        public class ElementAttributes
+        {
+            public string Id { get; set; }
+            public string Name { get; set; }
+            public string Placeholder { get; set; }
+            public string Type { get; set; }
+            public string Class { get; set; }
         }
     }
 }

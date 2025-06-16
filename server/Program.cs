@@ -4,10 +4,6 @@ using AgentCore.ElementResolution;
 
 //using AgentCore.Interfaces;
 using AgentCore.Services;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using server.AgentCore.ElementResolution;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);

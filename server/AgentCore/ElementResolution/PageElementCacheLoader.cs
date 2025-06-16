@@ -2,7 +2,7 @@
 using AgentCore.ElementResolution;
 using Microsoft.Playwright;
 
-namespace server.AgentCore.ElementResolution
+namespace AgentCore.ElementResolution
 {
     public class PageElementCacheLoader
     {
@@ -13,15 +13,23 @@ namespace server.AgentCore.ElementResolution
             _cache = cache;
         }
 
-        /// <summary>
-        /// This should be called right after page navigation to cache the elements.
-        /// </summary>
         public async Task LoadAsync(IPage page)
         {
-            var url = page.Url;
-            if (!string.IsNullOrEmpty(url))
+            try
             {
-                await _cache.CachePageElementsAsync(page, url);
+                // Ensure the page is fully loaded before capturing
+                await page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
+
+                var pageUrl = page.Url;
+                if (!string.IsNullOrEmpty(pageUrl))
+                {
+                    await _cache.CachePageElementsAsync(page, pageUrl);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                // Optionally log or handle exception
+                System.Console.WriteLine($"[CacheLoader] Failed to cache page elements: {ex.Message}");
             }
         }
     }
